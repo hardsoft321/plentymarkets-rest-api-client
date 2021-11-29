@@ -1,4 +1,5 @@
 import Dependencies._
+import sbtassembly.AssemblyPlugin.autoImport.assembly
 
 lazy val baseSettings = Seq(
   name := "plentymarkets-rest-api-client",
@@ -12,3 +13,9 @@ lazy val rootProject = (project in file("."))
     baseSettings,
     libraryDependencies ++= rootDependencies
   )
+
+assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case PathList("reference.conf") => MergeStrategy.concat
+  case x => MergeStrategy.first
+}
