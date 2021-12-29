@@ -1,7 +1,7 @@
 package org.hardsoft321.plentymarkets
 
-import ItemRequests.{AttributeValue => AttributeValueRequest}
-import ItemResponses.{Response, ValidationErrorResponse, AttributeValue => AttributeValueResponse}
+import ItemRequests.{BookIncomingStockRequest, Item, ItemRequest, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
+import ItemResponses.{PlentyResponse, Response, ValidationErrorResponse, VariationsPage, AttributeValue => AttributeValueResponse}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -103,7 +103,7 @@ object RestAPIClient extends StrictLogging {
       response => {
         updateLimit(operationType, createLimitFromHeaders(response.headers))
         response.entity.dataBytes.runReduce(_ ++ _)
-          .map { entity => Json.parse(entity.utf8String) }
+          .map { entity => println(entity.utf8String); Json.parse(entity.utf8String) }
     })
   }
 
@@ -112,9 +112,19 @@ object RestAPIClient extends StrictLogging {
     call(request.withMethod(HttpMethods.GET))
   }
 
+  private def delete(request: HttpRequest)(implicit actorSystem: ActorSystem): Future[JsValue] = {
+    implicit val executionContext: ExecutionContext = actorSystem.dispatcher
+    call(request.withMethod(HttpMethods.DELETE))
+  }
+
   private def post(request: HttpRequest)(implicit actorSystem: ActorSystem): Future[JsValue] = {
     implicit val executionContext: ExecutionContext = actorSystem.dispatcher
     call(request.withMethod(HttpMethods.POST))
+  }
+
+  private def put(request: HttpRequest)(implicit actorSystem: ActorSystem): Future[JsValue] = {
+    implicit val executionContext: ExecutionContext = actorSystem.dispatcher
+    call(request.withMethod(HttpMethods.PUT))
   }
 
   private def addUriPath(request: HttpRequest, path: String): HttpRequest = {
@@ -176,12 +186,17 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
 
   def getAttributeValues(attributeId: Int, currentPage: Int): Future[JsValue] = {
     secureGet(s"/items/attributes/${attributeId}/values", Some(Seq(
-      "itemsPerPage" -> 300,
+      "itemsPerPage" -> 1000,
       "page" -> currentPage
     )))
   }
 
+  def deleteAttributeValue(attributeId: Int, valueId: Int): Future[JsValue] = {
+    secureDelete(s"/items/attributes/${attributeId}/values/$valueId")
+  }
+
   def postAttributeValue(attributeId: Int, value: AttributeValueRequest): Future[JsValue] = {
+    println(Json.toJson(value))
     securePost(s"/items/attributes/${attributeId}/values", Json.toJson(value))
   }
 
@@ -206,10 +221,24 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
     }
   }
 
+  private def secureDelete(method: String, params: Option[Seq[(String, Any)]] = None): Future[JsValue] = {
+    withAuthToken {
+      token =>
+        delete(method, params)(baseRequest.withHeaders(new Authorization(OAuth2BearerToken(token.accessToken))))
+    }
+  }
+
   private def securePost(method: String, params: JsValue): Future[JsValue] = {
     withAuthToken {
       token =>
         post(method, params)(baseRequest.withHeaders(new Authorization(OAuth2BearerToken(token.accessToken))))
+    }
+  }
+
+  private def securePut(method: String, params: JsValue): Future[JsValue] = {
+    withAuthToken {
+      token =>
+        put(method, params)(baseRequest.withHeaders(new Authorization(OAuth2BearerToken(token.accessToken))))
     }
   }
 
@@ -218,6 +247,13 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
       case (key, value @Some(_)) => key -> value.toString
       case (key, value) => key -> value.toString
     }).toMap
+  }
+
+  private def delete(method: String, params: Option[Seq[(String, Any)]])(implicit requestBase: HttpRequest): Future[JsValue] = {
+    val request = RestAPIClient.addUriPath(requestBase, method)
+    delete(request.withUri(
+      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params)))
+    ))
   }
 
   private def get(method: String, params: Option[Seq[(String, Any)]])(implicit requestBase: HttpRequest): Future[JsValue] = {
@@ -231,13 +267,61 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
     RestAPIClient.get(request)
   }
 
+  private def delete(implicit request: HttpRequest): Future[JsValue] = {
+    RestAPIClient.delete(request)
+  }
+
   private def post(method: String, json: JsValue)(implicit requestBase: HttpRequest): Future[JsValue] = {
     val request = RestAPIClient.addUriPath(requestBase, method)
       .withEntity(ContentTypes.`application/json`, json.toString())
     post(request)
   }
 
+  private def put(method: String, json: JsValue)(implicit requestBase: HttpRequest): Future[JsValue] = {
+    val request = RestAPIClient.addUriPath(requestBase, method)
+      .withEntity(ContentTypes.`application/json`, json.toString())
+    put(request)
+  }
+
   private def post(request: HttpRequest): Future[JsValue] = {
     RestAPIClient.post(request)
+  }
+
+  private def put(request: HttpRequest): Future[JsValue] = {
+    RestAPIClient.put(request)
+  }
+
+
+  /**
+   * METHODS TO WORK WITH CONNECTOR
+   */
+  def variations(params: (String, Any)*): Future[VariationsPage] = {
+    secureGet("/items/variations", Some(Seq(params: _*)))
+      .map(response => {
+        response.validate[VariationsPage] match {
+          case JsSuccess(value, _) => value
+          case JsError(errors) => println(errors); throw new Exception(errors.toString())
+        }
+      })
+  }
+
+  def createItems(request: Array[Item]): Future[JsValue] = {
+    securePost("/items", Json.toJson(request))
+  }
+
+  def createVariation(itemId: Int, variation: ItemVariation): Future[JsValue] = {
+    securePost(s"/items/${itemId}/variations", Json.toJson(variation))
+  }
+
+  def stocks(itemId: Int, variationId: Int): Future[JsValue] = {
+    secureGet(s"/items/$itemId/variations/$variationId/stock")
+  }
+
+  def bookStocks(itemId: Int, variationId: Int, request: BookIncomingStockRequest): Future[JsValue] = {
+    securePut(s"/items/$itemId/variations/$variationId/stock/bookIncomingItems", Json.toJson(request))
+  }
+
+  def stockCorrection(itemId: Int, variationId: Int, request: StockCorrectionRequest): Future[JsValue] = {
+    securePut(s"/items/$itemId/variations/$variationId/stock/correction", Json.toJson(request))
   }
 }

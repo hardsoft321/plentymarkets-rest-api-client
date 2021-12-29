@@ -7,6 +7,9 @@ object ItemResponses {
     val id: Int
   }
   sealed trait Response
+  sealed trait ErrorResponse extends Response
+  type PlentyResponse[A <: Response, B <: Response] =
+    Either[A, B]
 
   /**
    * Base class for all entries that have name field
@@ -93,6 +96,19 @@ object ItemResponses {
   implicit val manufacturerReads: Reads[Manufacturer] = Json.reads[Manufacturer]
   implicit val manufacturerWrites: OWrites[Manufacturer] = Json.writes[Manufacturer]
 
+  case class Variation
+  (
+    id: Int,
+    isMain: Boolean,
+    mainVariationId: Option[Int],
+    itemId: Int,
+    position: Option[Int],
+    isActive: Boolean,
+    number: String
+  ) extends Response with Entity
+  implicit val variationReads: Reads[Variation] = Json.reads[Variation]
+  implicit val variationWrites: OWrites[Variation] = Json.writes[Variation]
+
   /**
    * Base class for pages Responses
    *
@@ -114,10 +130,12 @@ object ItemResponses {
   type AttributesPage = Page[Attribute, Int]
   type AttributeValuesPage = Page[AttributeValue, Int]
   type ManufacturersPage = Page[Manufacturer, String]
+  type VariationsPage = Page[Variation, Int]
 
   implicit val manufacturerPageReads: Reads[ManufacturersPage] = Json.reads[ManufacturersPage]
   implicit val attributeValuesPageReads: Reads[AttributeValuesPage] = Json.reads[AttributeValuesPage]
   implicit val attributesPageReads: Reads[AttributesPage] = Json.reads[AttributesPage]
+  implicit val variationsPageReads: Reads[VariationsPage] = Json.reads[VariationsPage]
 
   case class ValidationError(message: String)
   implicit val validationErrorReads: Reads[ValidationError] = Json.reads[ValidationError]
@@ -128,4 +146,32 @@ object ItemResponses {
     validation_errors: Map[String, Array[String]]
   ) extends Response
   implicit val validationErrorResponseReads: Reads[ValidationErrorResponse] = Json.reads[ValidationErrorResponse]
+
+  case class Item
+  (
+    id: Int,
+    manufacturerId: Int,
+    variations: Array[Variation]
+  ) extends Response
+  implicit val itemReads: Reads[Item] = Json.reads[Item]
+
+  case class WarehouseStock
+  (
+    purchasePrice: Double,
+    reservedListing: Int,
+    reservedBundles: Int,
+    variationId: Int,
+    itemId: Int,
+    warehouseId: Int,
+    physicalStock: Int,
+    reservedStock: Int,
+    netStock: Int,
+    reorderLevel: Int,
+    deltaReorderLevel: Int,
+    valueOfGoods: Option[Double]
+  ) extends Response
+  implicit val warehouseStockReads: Reads[WarehouseStock] = Json.reads[WarehouseStock]
+
+  type WarehouseStockResponse = Array[WarehouseStock]
+  //implicit val warehouseStockResponseReads: Reads[WarehouseStockResponse] = Json.reads[WarehouseStockResponse]
 }
