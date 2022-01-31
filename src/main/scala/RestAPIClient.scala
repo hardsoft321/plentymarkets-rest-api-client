@@ -1,7 +1,7 @@
 package org.hardsoft321.plentymarkets
 
 import ItemRequests.{BookIncomingStockRequest, Item, ItemRequest, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
-import ItemResponses.{PlentyResponse, Response, ValidationErrorResponse, VariationsPage, AttributeValue => AttributeValueResponse}
+import ItemResponses.{PlentyResponse, Response, ValidationErrorResponse, OrdersPage, VariationsPage, AttributeValue => AttributeValueResponse}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -309,6 +309,20 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
     secureGet("/items/variations", Some(Seq(params: _*)))
       .map(response => {
         response.validate[VariationsPage] match {
+          case JsSuccess(value, _) => value
+          case JsError(errors) => println(errors); throw new Exception(errors.toString())
+        }
+      })
+  }
+
+  def ordersJson(params: (String, Any)*): Future[JsValue] = {
+    secureGet("/orders", Some(Seq(params: _*)))
+  }
+
+  def orders(params: (String, Any)*): Future[OrdersPage] = {
+    ordersJson(params: _*)
+      .map(response => {
+        response.validate[OrdersPage] match {
           case JsSuccess(value, _) => value
           case JsError(errors) => println(errors); throw new Exception(errors.toString())
         }
