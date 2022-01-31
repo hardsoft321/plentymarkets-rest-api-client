@@ -107,6 +107,16 @@ object RestAPIClient extends StrictLogging {
     })
   }
 
+  type PageIndex = Int
+
+  def getAllPageEntries[Entry](pageEntries: PageIndex => Future[models.Page[Entry]], startPage: PageIndex = 1)
+  (implicit ec: ExecutionContext): Future[IndexedSeq[Entry]] = {
+    pageEntries(startPage).flatMap { page =>
+      if (page.isLastPage) Future.successful(page.entries)
+      else getAllPageEntries(pageEntries, startPage + 1).map(page.entries ++ _)
+    }
+  }
+
   private def get(request: HttpRequest)(implicit actorSystem: ActorSystem): Future[JsValue] = {
     implicit val executionContext: ExecutionContext = actorSystem.dispatcher
     call(request.withMethod(HttpMethods.GET))
