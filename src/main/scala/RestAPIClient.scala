@@ -242,24 +242,24 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
     }
   }
 
-  private def makeParams(query: Query, params: Option[Seq[(String, Any)]]): Map[String, String] = {
+  private def makeParams(query: Query, params: Option[Seq[(String, Any)]]): Seq[(String, String)] = {
     (query ++ params.getOrElse(Seq.empty).filter(_._2 != None).map {
       case (key, value @Some(_)) => key -> value.toString
       case (key, value) => key -> value.toString
-    }).toMap
+    })
   }
 
   private def delete(method: String, params: Option[Seq[(String, Any)]])(implicit requestBase: HttpRequest): Future[JsValue] = {
     val request = RestAPIClient.addUriPath(requestBase, method)
     delete(request.withUri(
-      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params)))
+      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params): _*))
     ))
   }
 
   private def get(method: String, params: Option[Seq[(String, Any)]])(implicit requestBase: HttpRequest): Future[JsValue] = {
     val request = RestAPIClient.addUriPath(requestBase, method)
     get(request.withUri(
-      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params)))
+      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params): _*))
     ))
   }
 
