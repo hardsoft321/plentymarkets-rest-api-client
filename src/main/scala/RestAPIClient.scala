@@ -103,7 +103,7 @@ object RestAPIClient extends StrictLogging {
       response => {
         updateLimit(operationType, createLimitFromHeaders(response.headers))
         response.entity.dataBytes.runReduce(_ ++ _)
-          .map { entity => println(entity.utf8String); Json.parse(entity.utf8String) }
+          .map { entity => logger.debug(entity.utf8String); Json.parse(entity.utf8String) }
     })
   }
 
