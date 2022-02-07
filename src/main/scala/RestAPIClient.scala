@@ -1,7 +1,7 @@
 package org.hardsoft321.plentymarkets
 
 import ItemRequests.{BookIncomingStockRequest, Item, ItemRequest, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
-import ItemResponses.{PlentyResponse, Response, ValidationErrorResponse, VariationsPage, AttributeValue => AttributeValueResponse}
+import ItemResponses.{PlentyResponse, Response, ValidationErrorResponse, OrdersPage, VariationsPage, AttributeValue => AttributeValueResponse}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -105,6 +105,16 @@ object RestAPIClient extends StrictLogging {
         response.entity.dataBytes.runReduce(_ ++ _)
           .map { entity => Json.parse(entity.utf8String) }
     })
+  }
+
+  type PageIndex = Int
+
+  def getAllPageEntries[Entry](pageEntries: PageIndex => Future[models.Page[Entry]], startPage: PageIndex = 1)
+  (implicit ec: ExecutionContext): Future[IndexedSeq[Entry]] = {
+    pageEntries(startPage).flatMap { page =>
+      if (page.isLastPage) Future.successful(page.entries)
+      else getAllPageEntries(pageEntries, startPage + 1).map(page.entries ++ _)
+    }
   }
 
   private def get(request: HttpRequest)(implicit actorSystem: ActorSystem): Future[JsValue] = {
@@ -242,24 +252,24 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
     }
   }
 
-  private def makeParams(query: Query, params: Option[Seq[(String, Any)]]): Map[String, String] = {
+  private def makeParams(query: Query, params: Option[Seq[(String, Any)]]): Seq[(String, String)] = {
     (query ++ params.getOrElse(Seq.empty).filter(_._2 != None).map {
       case (key, value @Some(_)) => key -> value.toString
       case (key, value) => key -> value.toString
-    }).toMap
+    })
   }
 
   private def delete(method: String, params: Option[Seq[(String, Any)]])(implicit requestBase: HttpRequest): Future[JsValue] = {
     val request = RestAPIClient.addUriPath(requestBase, method)
     delete(request.withUri(
-      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params)))
+      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params): _*))
     ))
   }
 
   private def get(method: String, params: Option[Seq[(String, Any)]])(implicit requestBase: HttpRequest): Future[JsValue] = {
     val request = RestAPIClient.addUriPath(requestBase, method)
     get(request.withUri(
-      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params)))
+      request.uri.withQuery(Uri.Query(makeParams(request.uri.query(), params): _*))
     ))
   }
 
@@ -310,6 +320,20 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
       "page" -> page,
       "with" -> "properties,variationProperties,variationBarcodes,variationSalesPrices,variationCategories,variationDefaultCategory,variationWarehouses,variationAttributeValues,unit,stock"
     ) ++ updated.map(x => Seq("updatedBetween" -> x)).getOrElse(Seq())))
+  }
+
+  def ordersJson(params: (String, Any)*): Future[JsValue] = {
+    secureGet("/orders", Some(Seq(params: _*)))
+  }
+
+  def orders(params: (String, Any)*): Future[OrdersPage] = {
+    ordersJson(params: _*)
+      .map(response => {
+        response.validate[OrdersPage] match {
+          case JsSuccess(value, _) => value
+          case JsError(errors) => println(errors); throw new Exception(errors.toString())
+        }
+      })
   }
 
   def createItems(request: Array[Item]): Future[JsValue] = {

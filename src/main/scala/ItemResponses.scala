@@ -1,6 +1,6 @@
 package org.hardsoft321.plentymarkets
 
-import play.api.libs.json.{Json, OWrites, Reads}
+import play.api.libs.json.{Json, OWrites, Reads, JsValue}
 
 object ItemResponses {
   sealed trait Entity {
@@ -130,11 +130,15 @@ object ItemResponses {
   type AttributesPage = Page[Attribute, Int]
   type AttributeValuesPage = Page[AttributeValue, Int]
   type ManufacturersPage = Page[Manufacturer, String]
+  type OrdersPage = Page[models.Order, Int]
   type VariationsPage = Page[Variation, Int]
 
+  implicit val jsonPageIntReads: Reads[Page[JsValue, Int]] = Json.reads[Page[JsValue, Int]]
+  implicit val jsonPageStringReads: Reads[Page[JsValue, String]] = Json.reads[Page[JsValue, String]]
   implicit val manufacturerPageReads: Reads[ManufacturersPage] = Json.reads[ManufacturersPage]
   implicit val attributeValuesPageReads: Reads[AttributeValuesPage] = Json.reads[AttributeValuesPage]
   implicit val attributesPageReads: Reads[AttributesPage] = Json.reads[AttributesPage]
+  implicit val ordersPageReads: Reads[OrdersPage] = Json.reads[OrdersPage]
   implicit val variationsPageReads: Reads[VariationsPage] = Json.reads[VariationsPage]
 
   case class ValidationError(message: String)
