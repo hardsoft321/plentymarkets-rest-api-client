@@ -103,7 +103,7 @@ object RestAPIClient extends StrictLogging {
       response => {
         updateLimit(operationType, createLimitFromHeaders(response.headers))
         response.entity.dataBytes.runReduce(_ ++ _)
-          .map { entity => println(entity.utf8String); Json.parse(entity.utf8String) }
+          .map { entity => Json.parse(entity.utf8String) }
     })
   }
 
@@ -303,6 +303,13 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
           case JsError(errors) => println(errors); throw new Exception(errors.toString())
         }
       })
+  }
+
+  def variations(page: Int = 1, updated: Option[String] = None): Future[JsValue] = {
+    secureGet("/items/variations", Some(Seq(
+      "page" -> page,
+      "with" -> "properties,variationProperties,variationBarcodes,variationSalesPrices,variationCategories,variationDefaultCategory,variationWarehouses,variationAttributeValues,unit,stock"
+    ) ++ updated.map(x => Seq("updatedBetween" -> x)).getOrElse(Seq())))
   }
 
   def createItems(request: Array[Item]): Future[JsValue] = {
