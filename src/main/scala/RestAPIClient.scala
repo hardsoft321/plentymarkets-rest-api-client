@@ -1,7 +1,11 @@
 package org.hardsoft321.plentymarkets
 
 import ItemRequests.{BookIncomingStockRequest, Item, ItemRequest, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
-import ItemResponses.{PlentyResponse, Response, ValidationErrorResponse, OrdersPage, VariationsPage, AttributeValue => AttributeValueResponse}
+import ItemResponses.{OrdersPage, PlentyResponse, Response, ValidationErrorResponse, VariationsPage, AttributeValue => AttributeValueResponse}
+import models.Category.CategoriesPage
+import models.Manufacturer.ManufacturersPage
+import models.Property.PropertiesPage
+import models.{Category, Manufacturer, Page, Property}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -332,6 +336,30 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
         response.validate[OrdersPage] match {
           case JsSuccess(value, _) => value
           case JsError(errors) => println(errors); throw new Exception(errors.toString())
+        }
+      })
+  }
+
+  def itemCategories(params: (String, Any)*): Future[CategoriesPage] = {
+    getPage[Category]("/categories")(Seq(params + "type" -> "item"): _*)
+  }
+
+  def manufacturers(params: (String, Any)*): Future[ManufacturersPage] = {
+    getPage[Manufacturer]("/items/manufacturers")(params: _*)
+  }
+
+  def properties(params: (String, Any)*): Future[PropertiesPage] = {
+    getPage[Property]("/items/properties")(params: _*)
+  }
+
+  def getPage[Entry](method: String)(params: (String, Any)*)(implicit reads: Reads[Page[Entry]]): Future[Page[Entry]] = {
+    secureGet(method, Some(Seq(params: _*)))
+      .map(response => {
+        response.validate[Page[Entry]] match {
+          case JsSuccess(value, _) => value
+          case JsError(errors) =>
+            println(errors)
+            throw new Exception(errors.toString())
         }
       })
   }
