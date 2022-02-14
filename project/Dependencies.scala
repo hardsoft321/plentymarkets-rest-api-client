@@ -18,6 +18,7 @@ object Dependencies {
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
+    "ai.x" %% "play-json-extensions" % "0.42.0",
     "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
   )
 }

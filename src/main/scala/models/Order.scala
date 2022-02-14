@@ -1,6 +1,8 @@
 package org.hardsoft321.plentymarkets.models
 
 import play.api.libs.json._
+import ai.x.play.json.Jsonx
+import ai.x.play.json.Encoders.encoder
 import java.time.Instant
 
 case class Order(
@@ -22,13 +24,14 @@ case class Order(
   hasDeliveryOrders: Option[Boolean],
   legacyOrderType: Option[String],
   contactSenderId: Option[Int],
+  contactSender: Option[Contact],
   contactReceiverId: Option[Int],
+  contactReceiver: Option[Contact],
   warehouseSenderId: Option[Int],
   warehouseReceiverId: Option[Int],
   orderItems: Seq[OrderItem],
 )
 
 object Order {
-  implicit val orderReads: Reads[Order] = Json.reads[Order]
-  implicit val orderWrites: OWrites[Order] = Json.writes[Order]
+  implicit val contactFormat: Format[Order] = Jsonx.formatCaseClass[Order]
 }
