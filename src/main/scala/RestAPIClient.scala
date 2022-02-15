@@ -84,7 +84,7 @@ object RestAPIClient extends StrictLogging {
   private def getLimits(operationType: OperationType): Option[RequestLimits] =
     limits.getOrElse(Map.empty).get(operationType)
 
-  private def call(request: HttpRequest)(implicit actorSystem: ActorSystem): Future[JsValue] = {
+  private def call(request: HttpRequest, repeat: Boolean = false)(implicit actorSystem: ActorSystem): Future[JsValue] = {
     implicit val executionContext: ExecutionContext = actorSystem.dispatcher
     // @todo: Make use of connection pool
     logger.info(s"Calling ${request.uri.toString()}")
@@ -103,12 +103,23 @@ object RestAPIClient extends StrictLogging {
       case None =>
     }
     Http().singleRequest(request).flatMap(_.toStrict(strictTimeout))
-      .flatMap (
-      response => {
+      .map(response => {
         updateLimit(operationType, createLimitFromHeaders(response.headers))
-        response.entity.dataBytes.runReduce(_ ++ _)
-          .map { entity => Json.parse(entity.utf8String) }
-    })
+        response
+      })
+      .flatMap(_.entity.dataBytes.runReduce(_ ++ _).map(_.utf8String))
+      .flatMap(responseText => {
+        if ( responseText.equalsIgnoreCase("short period write limit reached") ) {
+          if ( !repeat ) {
+            println("repeating call...")
+            call(request, repeat = true)
+          } else {
+            Future.successful(Json.parse("{}"))
+          }
+        } else {
+          Future.successful(Json.parse(responseText))
+        }
+      })
   }
 
   type PageIndex = Int
@@ -210,7 +221,6 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
   }
 
   def postAttributeValue(attributeId: Int, value: AttributeValueRequest): Future[JsValue] = {
-    println(Json.toJson(value))
     securePost(s"/items/attributes/${attributeId}/values", Json.toJson(value))
   }
 
