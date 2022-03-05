@@ -1,7 +1,7 @@
 package org.hardsoft321.plentymarkets
 
-import ItemRequests.{BookIncomingStockRequest, Item, ItemRequest, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
-import ItemResponses.{OrdersPage, PlentyResponse, Response, ValidationErrorResponse, VariationsPage, AttributeValue => AttributeValueResponse}
+import ItemRequests.{BookIncomingStockRequest, Item, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
+import ItemResponses.{OrdersPage, VariationsPage}
 import models.Category.CategoriesPage
 import models.Manufacturer.ManufacturersPage
 import models.Property.PropertiesPage
@@ -359,7 +359,7 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
   }
 
   def properties(params: (String, Any)*): Future[PropertiesPage] = {
-    getPage[Property]("/items/properties")(params: _*)
+    getPage[Property]("/properties")(params: _*)
   }
 
   def getPage[Entry](method: String)(params: (String, Any)*)(implicit reads: Reads[Page[Entry]]): Future[Page[Entry]] = {

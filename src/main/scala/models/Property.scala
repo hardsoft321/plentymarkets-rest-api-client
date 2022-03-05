@@ -6,21 +6,12 @@ import play.api.libs.json.{JsValue, Json, OWrites, Reads}
 case class Property
 (
   id: Int,
+  cast: String,
+  `type`: String,
   position: Int,
-  unit: Option[Int],
-  propertyGroupId: Option[Int],
-  backendName: String,
-  valueType: String,
-  isSearchable: Boolean,
-  isOderProperty: Boolean,
-  isShownOnItemPage: Boolean,
-  isShownOnItemList: Boolean,
-  isShownAtCheckout: Boolean,
-  isShownInPdf: Boolean,
-  comment: String,
-  surcharge: Int,
-  isShownAsAdditionalCosts: Boolean,
-  updatedAt: String
+  createdAt: String,
+  updatedAt: String,
+  names: Option[Array[PropertyName]]
 ) extends PlentyEntity {
   override def toJson: JsValue = Json.toJson(this)
 }
