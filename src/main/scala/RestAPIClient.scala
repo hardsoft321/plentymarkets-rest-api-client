@@ -1,7 +1,11 @@
 package org.hardsoft321.plentymarkets
 
-import ItemRequests.{BookIncomingStockRequest, Item, ItemRequest, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
-import ItemResponses.{PlentyResponse, Response, ValidationErrorResponse, OrdersPage, VariationsPage, AttributeValue => AttributeValueResponse}
+import ItemRequests.{BookIncomingStockRequest, Item, ItemVariation, StockCorrectionRequest, AttributeValue => AttributeValueRequest}
+import ItemResponses.{OrdersPage, VariationsPage}
+import models.Category.CategoriesPage
+import models.Manufacturer.ManufacturersPage
+import models.Property.PropertiesPage
+import models.{Category, Manufacturer, Page, Property}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -80,7 +84,7 @@ object RestAPIClient extends StrictLogging {
   private def getLimits(operationType: OperationType): Option[RequestLimits] =
     limits.getOrElse(Map.empty).get(operationType)
 
-  private def call(request: HttpRequest)(implicit actorSystem: ActorSystem): Future[JsValue] = {
+  private def call(request: HttpRequest, repeat: Boolean = false)(implicit actorSystem: ActorSystem): Future[JsValue] = {
     implicit val executionContext: ExecutionContext = actorSystem.dispatcher
     // @todo: Make use of connection pool
     logger.info(s"Calling ${request.uri.toString()}")
@@ -99,12 +103,23 @@ object RestAPIClient extends StrictLogging {
       case None =>
     }
     Http().singleRequest(request).flatMap(_.toStrict(strictTimeout))
-      .flatMap (
-      response => {
+      .map(response => {
         updateLimit(operationType, createLimitFromHeaders(response.headers))
-        response.entity.dataBytes.runReduce(_ ++ _)
-          .map { entity => Json.parse(entity.utf8String) }
-    })
+        response
+      })
+      .flatMap(_.entity.dataBytes.runReduce(_ ++ _).map(_.utf8String))
+      .flatMap(responseText => {
+        if ( responseText.equalsIgnoreCase("short period write limit reached") ) {
+          if ( !repeat ) {
+            println("repeating call...")
+            call(request, repeat = true)
+          } else {
+            Future.successful(Json.parse("{}"))
+          }
+        } else {
+          Future.successful(Json.parse(responseText))
+        }
+      })
   }
 
   type PageIndex = Int
@@ -206,7 +221,6 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
   }
 
   def postAttributeValue(attributeId: Int, value: AttributeValueRequest): Future[JsValue] = {
-    println(Json.toJson(value))
     securePost(s"/items/attributes/${attributeId}/values", Json.toJson(value))
   }
 
@@ -332,6 +346,30 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
         response.validate[OrdersPage] match {
           case JsSuccess(value, _) => value
           case JsError(errors) => println(errors); throw new Exception(errors.toString())
+        }
+      })
+  }
+
+  def itemCategories(params: (String, Any)*): Future[CategoriesPage] = {
+    getPage[Category]("/categories")(Seq(params + "type" -> "item"): _*)
+  }
+
+  def manufacturers(params: (String, Any)*): Future[ManufacturersPage] = {
+    getPage[Manufacturer]("/items/manufacturers")(params: _*)
+  }
+
+  def properties(params: (String, Any)*): Future[PropertiesPage] = {
+    getPage[Property]("/properties")(params: _*)
+  }
+
+  def getPage[Entry](method: String)(params: (String, Any)*)(implicit reads: Reads[Page[Entry]]): Future[Page[Entry]] = {
+    secureGet(method, Some(Seq(params: _*)))
+      .map(response => {
+        response.validate[Page[Entry]] match {
+          case JsSuccess(value, _) => value
+          case JsError(errors) =>
+            println(errors)
+            throw new Exception(errors.toString())
         }
       })
   }
