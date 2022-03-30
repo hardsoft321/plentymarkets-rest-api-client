@@ -116,6 +116,8 @@ object RestAPIClient extends StrictLogging {
           } else {
             Future.successful(Json.parse("{}"))
           }
+        } else if (responseText.isEmpty) {
+          Future.successful(JsString(""))
         } else {
           Future.successful(Json.parse(responseText))
         }
@@ -392,5 +394,13 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
 
   def stockCorrection(itemId: Int, variationId: Int, request: StockCorrectionRequest): Future[JsValue] = {
     securePut(s"/items/$itemId/variations/$variationId/stock/correction", Json.toJson(request))
+  }
+
+  def updateOrder(orderId: Int, data: JsValue): Future[JsValue] = {
+    securePut(s"/orders/$orderId", data)
+  }
+
+  def deleteOrderItem(orderId: Int, orderItemId: Int): Future[JsValue] = {
+    secureDelete(s"/orders/$orderId/items/$orderItemId")
   }
 }
