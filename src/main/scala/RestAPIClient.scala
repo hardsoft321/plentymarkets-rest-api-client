@@ -338,6 +338,10 @@ class RestAPIClient private(baseUri: Uri, username: String, password: String)(im
     ) ++ updated.map(x => Seq("updatedBetween" -> x)).getOrElse(Seq())))
   }
 
+  def variationSalesPrices(params: (String, Any)*): Future[JsValue] = {
+    secureGet("/items/variations/variation_sales_prices", Some(Seq(params: _*)))
+  }
+
   def ordersJson(params: (String, Any)*): Future[JsValue] = {
     secureGet("/orders", Some(Seq(params: _*)))
   }
