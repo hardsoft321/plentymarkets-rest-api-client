@@ -31,6 +31,7 @@ case class Order(
   warehouseReceiverId: Option[Int],
   orderItems: Seq[OrderItem],
   orderReferences: Option[Seq[OrderReference]],
+  documents: Option[Seq[Document]],
 )
 
 object Order {
